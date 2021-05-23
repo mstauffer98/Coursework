@@ -1,0 +1,17 @@
+Michael Stauffer
+
+CST-425
+
+4/26/20
+
+Database Connectivity with R Project Code Demonstration Video Link
+
+
+
+Here is the Loom video link to my demonstration of my R with SQL Server code.:
+
+https://www.loom.com/share/f545643a2d11400496b50ce8f6a629d4
+
+
+
+- Michael

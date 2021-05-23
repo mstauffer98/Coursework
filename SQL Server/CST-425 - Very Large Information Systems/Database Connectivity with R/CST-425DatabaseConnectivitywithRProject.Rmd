@@ -1,0 +1,216 @@
+---
+title: "CST-425DatabaseConnectivitywithRProject"
+author: "Michael Stauffer"
+date: "4/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Database Connectivity with R
+
+```{r accessDB}
+
+# Import necessary library
+library(odbc)
+
+# Connect to SQL Server database "StudentData"
+con <- dbConnect(odbc(),
+                 Driver = "SQL Server",
+                 Server = "DESKTOP-FQ74GBN",
+                 Database = "StudentData",
+                 UID = "sa",
+                 PWD = rstudioapi::askForPassword("Database password"))
+
+```
+
+## High Scorers Query
+
+The query below seeks to fetch the names of the students who scored higher than 90% in the "Score" column.:
+
+```{r selectHighScorers, echo=TRUE}
+
+# Select students that got a "Score" greater than 90
+highScorers <- dbSendQuery(con, "SELECT LastName, FirstName, Score FROM Student WHERE Score > 90")
+# Display selection
+dbFetch(highScorers)
+
+```
+
+## Record Insertion Query
+
+The query below seeks to add a new record to the "StudentData" table. The "Extracurricular" and "Probability" columns are intentionally left blank for further query task performance.:
+
+```{r insertRecord, echo=TRUE}
+
+# Insert new student record for "Guy New" into table
+dbSendQuery(con, "INSERT INTO Student([SID],[LastName],[FirstName],[Score],[GPA]) VALUES ('01234567','New','Guy',90,3.14)")
+# Select values of table
+newRecordTable <- dbSendQuery(con, "SELECT * FROM Student")
+# Print values of table
+dbFetch(newRecordTable)
+
+```
+
+## Probability Queries
+
+     The queries below demonstrates the calculation and effect of probability upon a dataset. The probability is specifically calculated with regard to the "Extracurricular" field of the data. The probability is calculated by multiplying the probability of the "Extracurricular" option, the probability of each "Extracurricular" option with each 1.00 point "GPA" bracket, and the probability of each 1.00 point "GPA" bracket with each letter grade for the "Score" (Sen & Deshpande, 2007). It should be acknowledged that the other three fields of the dataset - Student ID (SID), LastName, and FirstName - were not included in the probability calculation. These values were considered only nominal, and so were presumed to have no correlative effect to each other. Hence, those three columns are ignored for the calculation of the probability. Continuing, the first probability of the whole is calculated by the number of each extracurricular activity (Sports, Choir, Book Club, and Band) over their occurrence within the total dataset. The second probability took the occurrence that a student participated in each extracurricular activity also had a GPA in each 1.00 bracket (1.00-1.99, 2.00-2.99, and 3.00-4.00). And, the third probability took account of the occurrence that a student within each GPA bracket also had a score within each letter grade (90-100, 80-89, 70-79, 60-69, and Below 60). In the end, the overall probability examines the possibility that the combinations of "Extracurricular," "GPA," and "Score" are parts of the same record (Sen & Deshpande, 2007).
+
+     The specific query task performed in the code below was determining the most likely extracurricular activity that the newly inserted student "Guy New" participated in. The different combinations of the extracurricular were plugged into the table via the function "findProbTable." The "Probability" column was then found based upon the insertion of the new data point. Ultimately, Guy New was equally probable to be in Sports or in Band. The probability for both these extracurricular activities was 1.8%. Both Choir and Book Club were equally secondly likely at a 1.4% probability. These pairs were each equally likely to each other most likely because Sports and Band each originally had three students participating and Choir and Book Club each had two. As the extracurricular activity was the key factor in the calculation of the probability, the increase of each number of participants by one had a very noticeable impact on the whole. This can be understood as a non-trivial query in that, understandably, those with similar GPAs are often likely to have similar interests. Also, it is a sign that those with similar interests would likely know each other better and therefore study more closely together with regard to their scores. In the end, given his "Score" of 90 and GPA of 3.14, Guy New mostly is an athlete, participating in "Sports," or a musician, participating in "Band."
+
+
+```{r findProbTable, echo=TRUE}
+
+# Calculate probability of accuracy and display table
+findProbTable <- function(newGuyEC, newGuyECProb, newGuyECGPAProb) {
+      dbSendQuery(con, paste("delete from Student where SID = '01234567'
+                              insert into Student([SID],[LastName],[FirstName],[Score],[GPA],[Extracurricular]) values 
+                                    ('01234567','New','Guy',90,3.14,", newGuyEC, ")
+      
+      declare @TotalCount decimal (10,5);
+      declare @SportsProb decimal(10,5), @ChoirProb decimal(10,5), 
+              @BookProb decimal(10,5), @BandProb decimal(10,5);
+               
+      set @TotalCount = (select count(*) from Student);
+      set @SportsProb = (select count(*) from Student where Extracurricular = 'Sports')/@TotalCount;
+      set @ChoirProb = (select count(*) from Student where Extracurricular = 'Choir')/@TotalCount;
+      set @BookProb = (select count(*) from Student where Extracurricular = 'Book Club')/@TotalCount;
+      set @BandProb = (select count(*) from Student where Extracurricular = 'Band')/@TotalCount;
+
+      declare @Sports1Prob decimal(10,5), @Sports2Prob decimal(10,5), @Sports3Prob decimal(10,5),                   
+              @Choir1Prob decimal(10,5), @Choir2Prob decimal(10,5), @Choir3Prob decimal(10,5), 
+		          @Book1Prob decimal(10,5), @Book2Prob decimal(10,5), @Book3Prob decimal(10,5),
+		          @Band1Prob decimal(10,5), @Band2Prob decimal(10,5), @Band3Prob decimal(10,5);
+
+      set @Sports1Prob = (select count(*) from Student where Extracurricular = 'Sports' and GPA between 1.00 and 1.99)/@TotalCount;
+      set @Sports2Prob = (select count(*) from Student where Extracurricular = 'Sports' and GPA between 2.00 and 2.99)/@TotalCount;
+      set @Sports3Prob = (select count(*) from Student where Extracurricular = 'Sports' and GPA between 3.00 and 4.00)/@TotalCount;
+      set @Choir1Prob = (select count(*) from Student where Extracurricular = 'Choir' and GPA between 1.00 and 1.99)/@TotalCount;
+      set @Choir2Prob = (select count(*) from Student where Extracurricular = 'Choir' and GPA between 2.00 and 2.99)/@TotalCount;
+      set @Choir3Prob = (select count(*) from Student where Extracurricular = 'Choir' and GPA between 3.00 and 4.00)/@TotalCount;
+      set @Book1Prob = (select count(*) from Student where Extracurricular = 'Book Club' and GPA between 1.00 and 1.99)/@TotalCount;
+      set @Book2Prob = (select count(*) from Student where Extracurricular = 'Book Club' and GPA between 2.00 and 2.99)/@TotalCount;
+      set @Book3Prob = (select count(*) from Student where Extracurricular = 'Book Club' and GPA between 3.00 and 4.00)/@TotalCount;
+      set @Band1Prob = (select count(*) from Student where Extracurricular = 'Band' and GPA between 1.00 and 1.99)/@TotalCount;
+      set @Band2Prob = (select count(*) from Student where Extracurricular = 'Band' and GPA between 2.00 and 2.99)/@TotalCount;
+      set @Band3Prob = (select count(*) from Student where Extracurricular = 'Band' and GPA between 3.00 and 4.00)/@TotalCount;
+
+      declare @1AProb decimal(10,5), @1BProb decimal(10,5), @1CProb decimal(10,5),
+              @1DProb decimal(10,5), @1FProb decimal(10,5), @2AProb decimal(10,5),
+              @2BProb decimal(10,5), @2CProb decimal(10,5), @2DProb decimal(10,5),
+              @2FProb decimal(10,5), @3AProb decimal(10,5), @3BProb decimal(10,5),
+              @3CProb decimal(10,5), @3DProb decimal(10,5), @3FProb decimal(10,5);
+
+      set @1AProb = (select count(*) from Student where GPA between 1.00 and 1.99 and Score between 90 and 100)/@TotalCount;
+      set @1BProb = (select count(*) from Student where GPA between 1.00 and 1.99 and Score between 80 and 89)/@TotalCount;
+      set @1CProb = (select count(*) from Student where GPA between 1.00 and 1.99 and Score between 70 and 79)/@TotalCount;
+      set @1DProb = (select count(*) from Student where GPA between 1.00 and 1.99 and Score between 60 and 69)/@TotalCount;
+      set @1FProb = (select count(*) from Student where GPA between 1.00 and 1.99 and Score < 60)/@TotalCount;
+      set @2AProb = (select count(*) from Student where GPA between 2.00 and 2.99 and Score between 90 and 100)/@TotalCount;
+      set @2BProb = (select count(*) from Student where GPA between 2.00 and 2.99 and Score between 80 and 89)/@TotalCount;
+      set @2CProb = (select count(*) from Student where GPA between 2.00 and 2.99 and Score between 70 and 79)/@TotalCount;
+      set @2DProb = (select count(*) from Student where GPA between 2.00 and 2.99 and Score between 60 and 69)/@TotalCount;
+      set @2FProb = (select count(*) from Student where GPA between 2.00 and 2.99 and Score < 60)/@TotalCount;
+      set @3AProb = (select count(*) from Student where GPA between 3.00 and 4.00 and Score between 90 and 100)/@TotalCount;
+      set @3BProb = (select count(*) from Student where GPA between 3.00 and 4.00 and Score between 80 and 89)/@TotalCount;
+      set @3CProb = (select count(*) from Student where GPA between 3.00 and 4.00 and Score between 70 and 79)/@TotalCount;
+      set @3DProb = (select count(*) from Student where GPA between 3.00 and 4.00 and Score between 60 and 69)/@TotalCount;
+      set @3FProb = (select count(*) from Student where GPA between 3.00 and 4.00 and Score < 60)/@TotalCount;
+
+      update Student set Probability = (@SportsProb * @Sports1Prob * @1FProb) where SID = '00000000';
+      update Student set Probability = (@ChoirProb * @Choir2Prob * @2DProb) where SID = '15331894';
+      update Student set Probability = (@SportsProb * @Sports2Prob * @2FProb) where SID = '34162045';
+      update Student set Probability = (@BookProb * @Book2Prob * @2CProb) where SID = '19996802';
+      update Student set Probability = (@BandProb * @Band2Prob * @2CProb) where SID = '34111998';
+      update Student set Probability = (@SportsProb * @Sports3Prob * @3BProb) where SID = '12319665';
+      update Student set Probability = (@ChoirProb * @Choir3Prob * @3AProb) where SID = '71983772';
+      update Student set Probability = (@BandProb * @Band1Prob * @1FProb) where SID = '08675309';
+      update Student set Probability = (@BookProb * @Book3Prob * @3FProb) where SID = '03111952';
+      update Student set Probability = (@BandProb * @Band3Prob * @3AProb) where SID = '99999999';
+      
+      update Student set Probability = (",newGuyECProb," * ", newGuyECGPAProb," * @3AProb) where SID = '01234567'; "))
+      
+      newProbTable <- dbSendQuery(con, "select * from Student;")
+      return(dbFetch(newProbTable))
+}
+
+# Find probability columns with regard to student "Guy New's" options for extracurricular activity
+findProbTable("'Sports'","@SportsProb","@Sports3Prob")
+findProbTable("'Choir'","@ChoirProb","@Choir3Prob")
+findProbTable("'Book Club'","@BookProb","@Book3Prob")
+findProbTable("'Band'","@BandProb","@Band3Prob")
+
+```
+
+      The second query task written examines the effect of the probability of the sureness of data upon a query. The specific query task performed in the code below was determining the busiest students based upon their GPA and extracurricular with the probable confidence in each student's record. First, a new table was created without the "Score" field and changing the "Extracurricular" field to a numeric type. All of the equivalent field data was copied over to the new table, but with each extracurricular activity denoted by an interger between 1 and 4. The specific query was then performed by taking the sum of the GPA and the Extracurricular activity number, each divided by four, and then multiplying the sum by the probability with regard to each record. This was developed as a measure to quantify the relative busyness of each student. The GPA is utilized at whole as a value of effort toward schoolwork. The extracurricular activities number is a ranking of the presumed extra time and effort attributed to activities outside of school. Sports is given the most at "4," followed by band at "3," choir at "2," and book club at "1." The GPA and extracurricular numbers were each divided by so as to put their values on a scale of 0 to 1; that is, to normalize them. The probability was multiplied by the sum of the quotients to give a sureness rating of the busyness of each student. If the probability was higher, it was mostly that the data values for that student were true. In the end, Guy Last was determined to most confidently be the busiest student at a score of 0.0315. Guy Last had a perfect GPA, was in the second-highest marking extracurricular activity of "Band," and tied for the most probable data with Guy New since the "Band" data was filled in for Guy New. Joe Schmoe was acknowledged to be the least confidently busy with a score of 0.002025. Joe Schmoe was in the second-lowest bracket for GPA and extracurricular activity as well as had a low probability score of 0.002. This all leads to the useful, non-trivial scenario in trying to determine the students that best utilize their time. For scholarships, in particular, even if a student does not have the best GPA, they may be considered to have a good record if they done a number of things with their time outside of school, such as extracurricular activities. The confidence of this further takes into an amount of veracity toward the student's accomplishments. Ultimately, the most promising can be assessed and rewarded for the hard work based upon different metrics and the probable confidence in their work against their peers.
+
+```{r findStudentBusyness, echo=TRUE}
+
+# Create new table and convert "Extracurricular" activities to numbers
+dbSendQuery(con, "drop table BusyStudent
+                  create table BusyStudent (SID varchar(8) not null,
+                                            LastName varchar(20) not null,
+                                        	  FirstName varchar(20) not null,
+	                                         GPA float(3) not null,
+	                                         Extracurricular numeric(20),
+                                            Probability decimal(10,3),
+	                                         primary key (SID));
+
+	               insert into BusyStudent([SID], [LastName], [FirstName], [GPA], [Probability])
+                        select SID, LastName, FirstName, GPA, Probability from Student
+	 
+                  update BusyStudent set Extracurricular = 4 where SID = '00000000';
+                  update BusyStudent set Extracurricular = 2 where SID = '15331894';
+                  update BusyStudent set Extracurricular = 4 where SID = '34162045';
+                  update BusyStudent set Extracurricular = 1 where SID = '19996802';
+                  update BusyStudent set Extracurricular = 3 where SID = '34111998';
+                  update BusyStudent set Extracurricular = 4 where SID = '12319665';
+                  update BusyStudent set Extracurricular = 2 where SID = '71983772';
+                  update BusyStudent set Extracurricular = 3 where SID = '08675309';
+                  update BusyStudent set Extracurricular = 1 where SID = '03111952';
+                  update BusyStudent set Extracurricular = 3 where SID = '99999999';
+                  update BusyStudent set Extracurricular = 3 where SID = '01234567';")
+
+# Create selection of students by the confidence in busyness within their record
+assuredStudentBusyness <- dbSendQuery(con, "select LastName, FirstName, GPA, Extracurricular, Probability,
+			                                          (Probability * (GPA/4 + Extracurricular/4)) as Busyness
+                                                   from BusyStudent order by Busyness desc")
+# Display busyness selection
+dbFetch(assuredStudentBusyness)
+
+
+```
+
+## References
+
+Concatenate strings. (2010, April 28). Retrieved April 25, 2020, from https://www.math.ucla.edu/~anderson/rw1001/library/base/html/paste.html
+
+Jabberwockey, & Sam. (2018, May 21). R ODBC nanodbc error when not using DSN. Retrieved April 24, 2020, from https://stackoverflow.com/questions/50139986/r-odbc-nanodbc-error-when-not-using-dsn
+
+moretea, & swampBoogie. (2009, September 2). Stupid SQL question: divide by variable. Retrieved April 25, 2020, from https://www.sitepoint.com/community/t/stupid-sql-question-divide-by-variable/5403
+
+Pylvainen, I. (2020, April 13). Setting up R to connect to SQL Server. Retrieved April 22, 2020, from https://support.rstudio.com/hc/en-us/articles/214510788-Setting-up-R-to-connect-to-SQL-Server-
+
+Refsnes Data. (n.d.). SQL BETWEEN operator. Retrieved April 25, 2020, from https://www.w3schools.com/sql/sql_between.asp
+
+Refsnes Data. (2008, April 1). SQL UPDATE statement. Retrieved March 10, 2019, from https://www.w3schools.com/sql/sql_update.asp
+
+Refsnes Data. (2017, March 17). SQL COUNT(), AVG() and SUM() functions. Retrieved April 25, 2020, from https://www.w3schools.com/sql/sql_count_avg_sum.asp
+
+Roth, J., Hamilton, B., Guyer, C., Milener, G., Masha at MSFT, Byham, R., … Kumar, S. (2017, September 13). Data types (Transact-SQL) - SQL Server. Retrieved January 19, 2019, from https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql?view=sql-server-ver15
+
+Roth, J., Guyer, C., Milener, G., Hamilton, B., Jenks, A., Kumar, S., … Laudenschlager, D. (2017, September 12). Variables (Transact-SQL) - SQL Server. Retrieved April 25, 2020, from https://docs.microsoft.com/en-us/sql/t-sql/language-elements/variables-transact-sql?view=sql-server-ver15
+
+RStudio. (n.d.). Databases using R. Retrieved April 24, 2020, from https://db.rstudio.com/odbc
+
+Sen, P., & Deshpande, A. (2007). Representing and querying correlated tuples in probabilistic databases. <i>2007 IEEE 23rd International Conference on Data Engineering</i>. doi: 10.1109/icde.2007.367905
+
+Simo. (2018, September 7). SQL Server round and truncate issue (M. Vernon, Ed.). Retrieved April 25, 2020, from https://stackoverflow.com/questions/52225141/sql-server-round-and-truncate-issue
+
+Stefanelli, J. (2011, December 20). Set probability With SQL query. Retrieved April 25, 2020, from https://stackoverflow.com/questions/8582642/set-probability-with-sql-query
+
+Stein, S., Guyer, C., Milener, G., Hamilton, B., Kumar, S., Schonning, N., & Dhyne, K. (2016, September 1). Copy columns from one table to another (Database engine) - SQL Server. Retrieved April 25, 2020, from https://docs.microsoft.com/en-us/sql/relational-databases/tables/copy-columns-from-one-table-to-another-database-engine?view=sql-server-ver15
+
+www.sqlservertutorial.net. (2018, September 10). SQL Server ALTER TABLE ADD column. Retrieved April 24, 2020, from https://www.sqlservertutorial.net/sql-server-basics/sql-server-alter-table-add-column/
